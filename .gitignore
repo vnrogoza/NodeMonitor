@@ -1,0 +1,16 @@
+# Environment directory
+.venv/
+venv/
+# Cache and data
+.data/
+.vscode/
+__pycache__/
+BAK/
+monitor.db
+
+# Environment variables
+.env
+
+# File types
+*.png
+*.html
