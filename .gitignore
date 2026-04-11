@@ -6,7 +6,6 @@ venv/
 .vscode/
 __pycache__/
 BAK/
-monitor.db
 
 # Environment variables
 .env
@@ -14,3 +13,4 @@ monitor.db
 # File types
 *.png
 *.html
+*.db
