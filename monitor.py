@@ -12,9 +12,11 @@ from config import (
     MONITOR_URL,
     REPORT_OUTPUT_PATH,
     REPORT_TEMPLATE_PATH,
+    REPORT_HEADER,
     REPORT_INTERVAL_MINUTES,
     LOG_LEVEL,
-    REPORT_HEADER,
+    WEBHOOK_TIMEOUT_SECONDS,
+    WEBHOOK_URL,
 )
 
 logging.basicConfig(
@@ -23,11 +25,12 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-# Создание таблицы, если не существует
-try:
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("""
+
+def initialize_database():
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
 CREATE TABLE IF NOT EXISTS requests_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     url TEXT,
@@ -37,9 +40,39 @@ CREATE TABLE IF NOT EXISTS requests_log (
     timestamp DATETIME
 )
 """)
-    conn.commit()
-finally:
-    conn.close()
+            conn.commit()
+    except sqlite3.Error as db_error:
+        logging.error("Ошибка инициализации БД: %s", str(db_error)[:100])
+
+
+def build_webhook_payload(url, status_code, response_time_ms, error_message):
+    return {
+        "event": "monitor_failure" if status_code != 200 or error_message else "monitor_success",
+        "url": url,
+        "status_code": status_code,
+        "response_time_ms": response_time_ms,
+        "error_message": error_message,
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+
+
+def send_webhook_notification(webhook_url, payload):
+    if not webhook_url:
+        logging.debug("Webhook URL is not configured, skipping notification.")
+        return False
+
+    try:
+        response = requests.post(webhook_url, json=payload, timeout=WEBHOOK_TIMEOUT_SECONDS)
+        response.raise_for_status()
+        logging.info("Webhook notification sent to %s", webhook_url)
+        return True
+    except requests.RequestException as e:
+        logging.error("Webhook notification failed: %s", str(e))
+        return False
+
+
+def format_report_data(rows):
+    return str([list(item) for item in rows])[1:]
 
 
 def RunTask():
@@ -64,6 +97,10 @@ def RunTask():
         error_message = str(e)[:100]
         logging.warning("Ошибка при выполнении запроса: %s", error_message)
 
+    if status_code != 200 or error_message:
+        payload = build_webhook_payload(url, status_code, response_time_ms, error_message)
+        send_webhook_notification(WEBHOOK_URL, payload)
+
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -81,7 +118,7 @@ def RunTask():
 
         
 def CreateReport():
-    import os, webbrowser
+    conn = None
     try:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
@@ -94,7 +131,7 @@ def CreateReport():
         if conn:
             conn.close()
 
-    data = str([list(item) for item in data])[1:]
+    data = format_report_data(data)
     data = '[["Дата Время", "Запрос, мс", { role: "style" }], ' + data
 
     try:
@@ -129,6 +166,7 @@ def RunSchedule():
 
 
 if __name__ == "__main__":
+    initialize_database()
     RunSchedule()
     
     
