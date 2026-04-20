@@ -1,0 +1,27 @@
+<head>
+  <title>Мониторинг $header</title>
+  <style>html, body, #container { width: 100%; height: 100%; margin: 20; padding: 20; }</style>
+</head>
+<body>
+  <div id="chart_div" style="width: 1800px; height: 600px;"></div>
+  <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+  <script type="text/javascript">
+  google.charts.load('current', {packages: ['corechart', 'bar']});
+  google.charts.setOnLoadCallback(drawBasic);
+
+  function drawBasic() {
+       var data = google.visualization.arrayToDataTable( $data );
+      var options = {
+        title: 'Мониторинг доступности сайта $header',
+        chartArea: {width: '80%', height: '80%'},
+        hAxis: {title: 'Дата Время', format: 'h:mm', showTextEvery:12},
+        vAxis: {title: 'Запрос, мс'},
+        legend: {position:'none'}
+      };
+
+      var chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+      chart.draw(data, options);
+  }
+  </script>
+</body>
+</html>
